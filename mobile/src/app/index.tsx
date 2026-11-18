@@ -269,7 +269,7 @@ export default function Home() {
                     <Text style={{ color: "#374151", lineHeight: 21 }}>{p}</Text>
                   </View>
                 ) : (
-                  <Text style={{ color: "#9ca3af", fontSize: 13 }}>2개 이상 모이면 패턴을 알려 드릴게요</Text>
+                  <Text style={{ color: "#9ca3af", fontSize: 13 }}>3개 이상 모이면 패턴을 알려 드릴게요</Text>
                 )}
                 {list.map((s) => (
                   <Pressable
@@ -278,7 +278,7 @@ export default function Home() {
                     style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 14 }}
                   >
                     <Text style={{ fontWeight: "500" }}>{fmt(s.top)} + {fmt(s.bottom)}</Text>
-                    <Text style={{ color: "#6b7280", marginTop: 4 }}>{s.silhouette}</Text>
+                    <Text style={{ color: "#6b7280", marginTop: 4 }}>{sil(s)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -289,6 +289,11 @@ export default function Home() {
       ) : null}
     </ScrollView>
   );
+}
+
+function sil(l: Look) {
+  if (l.top?.fit && l.bottom?.fit) return `상의 ${l.top.fit} + 하의 ${l.bottom.fit}`;
+  return l.silhouette || "";
 }
 
 function slotName(slot: string) {
@@ -306,14 +311,40 @@ function groupKeys(list: Look[]) {
   return Array.from(new Set(list.map(key)));
 }
 
+const TIGHT = ["슬림", "크롭", "타이트", "테이퍼드"];
+const LOOSE = ["오버핏", "루즈", "와이드", "세미오버", "부츠컷"];
+
+function band(fit?: string) {
+  if (!fit) return null;
+  if (TIGHT.includes(fit)) return "붙는";
+  if (LOOSE.includes(fit)) return "넉넉한";
+  return "적당한";
+}
+
 function pattern(list: Look[]) {
-  if (list.length < 2) return null;
-  const topFit = most(list.map((l) => l.top?.fit).filter(Boolean) as string[]);
+  if (list.length < 3) return null;
+  const combos = list
+    .map((l) => {
+      const t = band(l.top?.fit);
+      const b = band(l.bottom?.fit);
+      return t && b ? `상의는 ${t} 핏 + 하의는 ${b} 핏` : null;
+    })
+    .filter(Boolean) as string[];
   const topColor = most(list.map((l) => l.top?.color).filter(Boolean) as string[]);
-  const bottomFit = most(list.map((l) => l.bottom?.fit).filter(Boolean) as string[]);
-  if (!topFit || !bottomFit) return null;
-  const tail = topColor ? ` 상의 색은 ${topColor}이 가장 많습니다.` : "";
-  return `상의 ${topFit} + 하의 ${bottomFit} 조합을 반복해서 저장합니다.${tail}`;
+  const tail = topColor ? ` 상의 색은 ${topColor}${josa(topColor)} 가장 많습니다.` : "";
+  const top = most(combos);
+  if (!top) return null;
+  const n = combos.filter((c) => c === top).length;
+  if (n < 2) {
+    return `아직 반복되는 조합은 없습니다.${tail}`;
+  }
+  return `${top} 조합을 ${n}번 저장했습니다.${tail}`;
+}
+
+function josa(w: string) {
+  const c = w.charCodeAt(w.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return "가";
+  return (c - 0xac00) % 28 === 0 ? "가" : "이";
 }
 
 function most(arr: string[]) {
