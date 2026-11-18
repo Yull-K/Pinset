@@ -8,13 +8,17 @@
  * @module
  */
 
+import type * as decompose from "../decompose.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  decompose: typeof decompose;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
