@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, Pressable, Image, ScrollView, ActivityIndicator, Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { insertLook, listLooks, deleteLook, type Look, type Part, type Row } from "../lib/db";
 
-type Part = { category?: string; color?: string; fit?: string; length?: string; layered?: string; confidence?: string };
-type Look = { top?: Part; bottom?: Part; silhouette?: string; dressCode?: string; season?: string; error?: string; multiple?: boolean };
-type Saved = Look;
 type Brand = { name: string; why: string; query: string };
 type Item = { slot: string; label: string; brands: Brand[] };
 type Reco = { wearer: string; items: Item[] };
+type Decoded = Look & { error?: string };
 
 const SEASONS = ["봄가을", "여름", "겨울"];
 const CODES = ["정장", "비즈니스 캐주얼", "캐주얼"];
@@ -33,9 +32,17 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [finding, setFinding] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [saved, setSaved] = useState<Saved[]>([]);
+  const [saved, setSaved] = useState<Row[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    listLooks()
+      .then(setSaved)
+      .catch((e) => console.log(e))
+      .finally(() => setLoaded(true));
+  }, []);
 
   const pick = async () => {
     try {
@@ -52,7 +59,7 @@ export default function Home() {
       setExpanded({});
       setBusy(true);
 
-      const out = (await decompose({ base64: res.assets[0].base64!, mediaType: "image/jpeg" })) as Look;
+      const out = (await decompose({ base64: res.assets[0].base64!, mediaType: "image/jpeg" })) as Decoded;
       setBusy(false);
 
       if (out.error === "no_clothes" || (!out.top?.category && !out.bottom?.category)) {
@@ -75,12 +82,32 @@ export default function Home() {
     }
   };
 
-  const save = () => {
+  const save = async () => {
     if (!look) return;
-    setSaved([look, ...saved]);
-    setUri(null);
-    setLook(null);
-    setReco(null);
+    try {
+      await insertLook(look);
+      setSaved(await listLooks());
+      setUri(null);
+      setLook(null);
+      setReco(null);
+    } catch (e) {
+      setErr("저장에 실패했어요.");
+      console.log(e);
+    }
+  };
+
+  const remove = (id: number) => {
+    Alert.alert("삭제할까요?", "저장한 룩이 지워집니다.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          await deleteLook(id);
+          setSaved(await listLooks());
+        },
+      },
+    ]);
   };
 
   const ask = () => {
@@ -99,6 +126,14 @@ export default function Home() {
         <Text style={{ color: "#b91c1c", lineHeight: 21 }}>{err}</Text>
       </View>
     ) : null;
+
+  if (!loaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "white", alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   if (!uri && saved.length === 0) {
     return (
@@ -137,10 +172,10 @@ export default function Home() {
             </View>
           ) : null}
 
-          <Row label="상의" value={fmt(look.top)} />
-          {look.top?.layered ? <Row label="겹쳐 입음" value={look.top.layered} /> : null}
-          <Row label="하의" value={fmt(look.bottom)} />
-          <Row label="실루엣" value={look.silhouette} />
+          <Row2 label="상의" value={fmt(look.top)} />
+          {look.top?.layered ? <Row2 label="겹쳐 입음" value={look.top.layered} /> : null}
+          <Row2 label="하의" value={fmt(look.bottom)} />
+          <Row2 label="실루엣" value={look.silhouette} />
 
           <Pressable onPress={ask} style={{ paddingVertical: 10 }}>
             <Text style={{ color: "#2563eb", fontSize: 13 }}>잘못 분류됐나요? 문의하기</Text>
@@ -236,15 +271,20 @@ export default function Home() {
                 ) : (
                   <Text style={{ color: "#9ca3af", fontSize: 13 }}>2개 이상 모이면 패턴을 알려 드릴게요</Text>
                 )}
-                {list.map((s, i) => (
-                  <View key={i} style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 14 }}>
+                {list.map((s) => (
+                  <Pressable
+                    key={s.id}
+                    onLongPress={() => remove(s.id)}
+                    style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 14 }}
+                  >
                     <Text style={{ fontWeight: "500" }}>{fmt(s.top)} + {fmt(s.bottom)}</Text>
                     <Text style={{ color: "#6b7280", marginTop: 4 }}>{s.silhouette}</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             );
           })}
+          <Text style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>카드를 길게 누르면 삭제됩니다</Text>
         </View>
       ) : null}
     </ScrollView>
@@ -258,15 +298,15 @@ function slotName(slot: string) {
   return slot;
 }
 
-function key(s: Saved) {
+function key(s: Look) {
   return `${s.season || "계절 미정"} · ${s.dressCode || "코드 미정"}`;
 }
 
-function groupKeys(list: Saved[]) {
+function groupKeys(list: Look[]) {
   return Array.from(new Set(list.map(key)));
 }
 
-function pattern(list: Saved[]) {
+function pattern(list: Look[]) {
   if (list.length < 2) return null;
   const topFit = most(list.map((l) => l.top?.fit).filter(Boolean) as string[]);
   const topColor = most(list.map((l) => l.top?.color).filter(Boolean) as string[]);
@@ -310,7 +350,7 @@ function Chips({ items, value, onPick }: { items: string[]; value?: string | nul
   );
 }
 
-function Row({ label, value }: { label: string; value?: string }) {
+function Row2({ label, value }: { label: string; value?: string }) {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
       <Text style={{ color: "#6b7280" }}>{label}</Text>
