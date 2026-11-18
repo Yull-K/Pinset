@@ -9,6 +9,7 @@
  */
 
 import type * as decompose from "../decompose.js";
+import type * as recommend from "../recommend.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   decompose: typeof decompose;
+  recommend: typeof recommend;
 }>;
 
 /**
