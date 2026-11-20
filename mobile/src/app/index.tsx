@@ -411,23 +411,18 @@ export default function Home() {
                     const list = open ? all : all.slice(0, PREVIEW);
                     return (
                       <View key={it.slot} style={{ marginTop: 12, gap: 8 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151" }}>
-                          {slotName(it.slot)} · {it.label}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#eff6ff", borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12 }}>
+                          <Text style={{ fontSize: 13, color: "#1e40af", fontWeight: "600" }}>{slotName(it.slot)}</Text>
+                          {labelColor(it.label) ? (
+                            <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: labelColor(it.label)!, borderWidth: 1, borderColor: "#dbeafe" }} />
+                          ) : null}
+                          <Text style={{ fontSize: 14, color: "#1e3a8a", fontWeight: "600", flexShrink: 1 }}>{it.label}</Text>
+                        </View>
                         {list.map((b) => (
                           <View key={b.name} style={{ borderWidth: 1, borderColor: "#f3f4f6", borderRadius: 12, padding: 14, gap: 10 }}>
                             <View>
                               <Text style={{ fontWeight: "600", fontSize: 15 }}>{b.name}</Text>
                               <Text style={{ color: "#6b7280", marginTop: 3, fontSize: 13 }}>{b.why}</Text>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 }}>
-                                {b.color && SWATCH[COLOR_KO[b.color] ?? ""] ? (
-                                  <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: SWATCH[COLOR_KO[b.color]], borderWidth: 1, borderColor: "#e5e7eb" }} />
-                                ) : null}
-                                <Text style={{ color: "#9ca3af", fontSize: 11, flexShrink: 1 }}>
-                                  {b.query}
-                                  {b.color ? ` · 무신사는 ${COLOR_KO[b.color] ?? b.color} 필터` : ""}
-                                </Text>
-                              </View>
                             </View>
                             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                               {MALLS.map((m) => (
@@ -785,6 +780,14 @@ function sig(l: Look) {
 function sil(l: Look) {
   if (l.top?.fit && l.bottom?.fit) return `상의 ${l.top.fit} + 하의 ${l.bottom.fit}`;
   return l.silhouette || "";
+}
+
+function labelColor(label?: string) {
+  if (!label) return null;
+  for (const name of Object.keys(SWATCH)) {
+    if (label.includes(name)) return SWATCH[name];
+  }
+  return null;
 }
 
 function slotName(slot: string) {
