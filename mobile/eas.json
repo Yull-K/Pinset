@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 27.10.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CONVEX_URL": "https://efficient-canary-872.convex.cloud"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "ios": {
+        "credentialsSource": "local"
+      },
+      "env": {
+        "EXPO_PUBLIC_CONVEX_URL": "https://efficient-canary-872.convex.cloud"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6837304592",
+        "appleId": "yrdy26@naver.com"
+      }
+    }
+  }
+}

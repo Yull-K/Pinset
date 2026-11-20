@@ -1,0 +1,30 @@
+{
+  "note": "Convex action을 통해 Claude Haiku로 실제 호출한 결과입니다. 원본 이미지는 타인의 저작물이라 저장소에 포함하지 않고 분해 결과만 남깁니다.",
+  "calledAt": "2026-11-18",
+  "model": "claude-haiku-4-5",
+  "via": "convex action decompose:decompose",
+  "input": "출근룩 이미지 1장 (800px로 축소 후 base64 전송)",
+  "result": {
+    "top": {
+      "category": "하프집니트",
+      "color": "갈색",
+      "fit": "오버핏",
+      "layered": "흰색 티셔츠",
+      "confidence": "확실"
+    },
+    "bottom": {
+      "category": "슬랙스",
+      "color": "아이보리",
+      "fit": "와이드",
+      "length": "긴 기장",
+      "confidence": "확실"
+    },
+    "silhouette": "상의 오버핏 + 하의 와이드",
+    "dressCode": "비즈니스 캐주얼"
+  },
+  "findings": [
+    "같은 이미지를 수동으로 분해했던 결과와 일치합니다.",
+    "소재와 신발은 프롬프트에서 제외해, 정확도가 낮았던 항목을 아예 묻지 않습니다.",
+    "원본 크기로는 요청이 너무 커서 전송 전에 축소가 필요합니다. 앱에서도 같은 처리를 합니다."
+  ]
+}
