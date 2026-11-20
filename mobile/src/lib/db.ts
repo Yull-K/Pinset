@@ -41,6 +41,9 @@ async function get() {
     await db.execAsync("ALTER TABLE folders ADD COLUMN parentId INTEGER");
   } catch {}
   try {
+    await db.execAsync("ALTER TABLE looks ADD COLUMN reco TEXT");
+  } catch {}
+  try {
     const old = await db.getAllAsync<{ id: number }>(
       "SELECT id FROM folders WHERE isSample = 1 OR name IN ('출근룩', '사고 싶은 것')"
     );
@@ -93,6 +96,18 @@ export async function insertLook(look: Look): Promise<number> {
     JSON.stringify(look)
   );
   return r.lastInsertRowId;
+}
+
+export async function saveReco(id: number, reco: unknown) {
+  const d = await get();
+  await d.runAsync("UPDATE looks SET reco = ? WHERE id = ?", JSON.stringify(reco), id);
+}
+
+export async function getReco(id: number): Promise<unknown | null> {
+  const d = await get();
+  const r = await d.getFirstAsync<{ reco: string | null }>("SELECT reco FROM looks WHERE id = ?", id);
+  if (!r || !r.reco) return null;
+  try { return JSON.parse(r.reco); } catch { return null; }
 }
 
 export async function updateLook(id: number, look: Look) {

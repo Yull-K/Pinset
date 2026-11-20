@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Image, ScrollView, ActivityIndicator, Linking, Alert, Modal } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
-  insertLook, updateLook, setFolders, listLooks, deleteLook,
+  insertLook, updateLook, setFolders, listLooks, deleteLook, saveReco, getReco,
   listFolders, addFolder, renameFolder, removeFolder,
   type Look, type Part, type Row, type Folder,
 } from "../lib/db";
@@ -70,6 +70,7 @@ export default function Home() {
   const [sheet, setSheet] = useState(false);
   const [openRecent, setOpenRecent] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const lookIdRef = useRef<number | null>(null);
 
   const reload = async () => {
     setSaved(await listLooks());
@@ -133,17 +134,27 @@ export default function Home() {
       if (same) {
         setDup(true);
         setLookId(same.id);
+        lookIdRef.current = same.id;
         setLook({ ...next, seasons: same.seasons ?? next.seasons });
         setPicked(same.folders);
       } else {
         setLook(next);
-        setLookId(await insertLook(next));
+        const newId = await insertLook(next);
+        setLookId(newId);
+        lookIdRef.current = newId;
       }
       await reload();
 
       setFinding(true);
-      const r = (await recommend({ look: JSON.stringify(out), gender })) as Reco;
-      setReco(r);
+      const id = same ? same.id : lookIdRef.current;
+      const cached = id ? await getReco(id) : null;
+      if (cached) {
+        setReco(cached as Reco);
+      } else {
+        const r = (await recommend({ look: JSON.stringify(out), gender })) as Reco;
+        setReco(r);
+        if (id) await saveReco(id, r);
+      }
     } catch (e) {
       setErr("살펴보지 못했어요. 다른 사진으로 다시 해보시겠어요?");
       console.log(e);
@@ -236,6 +247,33 @@ export default function Home() {
     ]);
   };
 
+  const reopen = async (row: Row) => {
+    setUri("saved");
+    setLook(row);
+    setLookId(row.id);
+    setPicked(row.folders);
+    setReco(null);
+    setErr(null);
+    setDup(false);
+    setExpanded({});
+    setSheet(false);
+    try {
+      setFinding(true);
+      const cached = await getReco(row.id);
+      if (cached) {
+        setReco(cached as Reco);
+      } else {
+        const r = (await recommend({ look: JSON.stringify(row), gender })) as Reco;
+        setReco(r);
+        await saveReco(row.id, r);
+      }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setFinding(false);
+    }
+  };
+
   const remove = (id: number) => {
     Alert.alert("기록에서 지울까요?", "", [
       { text: "취소", style: "cancel" },
@@ -244,6 +282,19 @@ export default function Home() {
   };
 
   const ask = () => Alert.alert("문의하기", "곧 상담 채널이 열립니다. 지금은 준비 중이에요.", [{ text: "확인" }]);
+
+  const pickedLabel = () => {
+    const names = picked.map((id) => {
+      const f = folders.find((x) => x.id === id);
+      if (!f) return null;
+      if (f.parentId != null) {
+        const p = folders.find((x) => x.id === f.parentId);
+        return p ? `${p.name} > ${f.name}` : f.name;
+      }
+      return f.name;
+    }).filter(Boolean);
+    return names.join(", ") + "에 담았어요";
+  };
 
   const genderLine = gender === "상관없음" ? "성별 상관없이 추천해요" : `${gender} 브랜드를 추천해요`;
   const nextGender = () => setGender(GENDERS[(GENDERS.indexOf(gender) + 1) % GENDERS.length]);
@@ -291,7 +342,13 @@ export default function Home() {
             <Text style={{ color: "#2563eb", fontSize: 15 }}>← 홈으로</Text>
           </Pressable>
 
-          <Image source={{ uri }} style={{ width: "100%", height: 260, borderRadius: 12 }} resizeMode="cover" />
+          {uri === "saved" ? (
+            <View style={{ backgroundColor: "#f9fafb", borderRadius: 12, paddingVertical: 22, alignItems: "center" }}>
+              <Text style={{ fontSize: 12, color: "#9ca3af" }}>기록에서 다시 불러왔어요. 사진은 저장하지 않습니다.</Text>
+            </View>
+          ) : (
+            <Image source={{ uri }} style={{ width: "100%", height: 260, borderRadius: 12 }} resizeMode="cover" />
+          )}
           {busy ? <ActivityIndicator size="large" /> : null}
 
           {look ? (
@@ -426,7 +483,7 @@ export default function Home() {
               >
                 <Text style={{ fontSize: 16 }}>📁</Text>
                 <Text style={{ fontSize: 15, fontWeight: "600", color: picked.length > 0 ? "#1e40af" : "white" }}>
-                  {picked.length > 0 ? `${picked.length}개 폴더에 담김` : "폴더로 저장하기"}
+                  {picked.length > 0 ? "폴더에 담겼어요" : "폴더로 저장하기"}
                 </Text>
               </Pressable>
             </View>
@@ -601,7 +658,8 @@ export default function Home() {
 
         {usedRoots.map((f) => {
           const kids = kidsOf(f.id).filter((k) => saved.some((s) => s.folders.includes(k.id)));
-          const direct = saved.filter((s) => s.folders.includes(f.id));
+          const kidIds = kidsOf(f.id).map((k) => k.id);
+          const direct = saved.filter((s) => s.folders.includes(f.id) && !s.folders.some((x) => kidIds.includes(x)));
           const open = filter === f.id;
           return (
             <View key={f.id} style={{ gap: 8 }}>
@@ -633,6 +691,7 @@ export default function Home() {
                         {klist.map((s) => (
                           <Pressable
                             key={s.id}
+                            onPress={() => reopen(s)}
                             onLongPress={() => unpin(s.id, k.id, k.name)}
                             style={{ backgroundColor: "white", borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 14, marginLeft: 10 }}
                           >
@@ -654,7 +713,7 @@ export default function Home() {
                       <Text style={{ color: "#6b7280", marginTop: 4, fontSize: 13 }}>{sil(s)}</Text>
                     </Pressable>
                   ))}
-                  <Text style={{ fontSize: 11, color: "#9ca3af" }}>길게 누르면 이 폴더에서 빠집니다</Text>
+                  <Text style={{ fontSize: 11, color: "#9ca3af" }}>카드를 누르면 다시 열리고, 길게 누르면 폴더에서 빠집니다</Text>
                 </View>
               ) : null}
             </View>
@@ -679,6 +738,7 @@ export default function Home() {
             {saved.map((s) => (
               <Pressable
                 key={s.id}
+                onPress={() => reopen(s)}
                 onLongPress={() => remove(s.id)}
                 style={{ backgroundColor: "white", borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, padding: 14 }}
               >
@@ -697,7 +757,7 @@ export default function Home() {
                 ) : null}
               </Pressable>
             ))}
-            <Text style={{ fontSize: 11, color: "#9ca3af" }}>카드를 길게 누르면 기록에서 지워집니다</Text>
+            <Text style={{ fontSize: 11, color: "#9ca3af" }}>카드를 누르면 다시 열리고, 길게 누르면 지워집니다</Text>
           </View>
         ) : null}
       </View>
