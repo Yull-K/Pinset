@@ -20,7 +20,7 @@ ${look}
     {
       "slot": "",
       "label": "",
-      "brands": [ { "name": "", "why": "", "query": "" } ]
+      "brands": [ { "name": "", "why": "", "query": "", "color": "" } ]
     }
   ]
 }
@@ -32,11 +32,12 @@ ${look}
 - label: 그 아이템을 한국어로. 예 "검정 오버핏 니트"
 - brands: 아이템마다 정확히 10개. 무신사, W컨셉, 지그재그에서 실제로 취급하는 브랜드로
 - 앞의 4개를 가장 잘 맞는 순서로 배치해
-- 대상 성별이 주로 입는 브랜드로 골라
+- 대상 성별이 주로 입는 브랜드로 골라. 대상이 상관없음이면 성별 구분 없이 유니섹스 브랜드 위주로
 - 가격대를 섞어. 저가부터 중고가까지
 - name: 브랜드명 한국어 표기
 - why: 이 아이템과 맞는 이유 한 줄. 20자 이내
-- query: "브랜드명 + 아이템" 형태의 검색어
+- query: "브랜드명 + 아이템 종류"만. 색과 핏은 절대 넣지 마. 쇼핑몰 검색은 모든 단어가 맞아야 결과가 나와서, 색을 넣으면 결과가 비게 돼
+- color: 이 아이템의 색을 영문 대문자 한 단어로. BLACK, WHITE, NAVY, BEIGE, BROWN, GRAY, IVORY, KHAKI, GREEN, BLUE, RED, PINK, PURPLE, YELLOW, ORANGE 중 하나. 애매하면 빈 문자열
 - 확실하지 않은 브랜드는 넣지 마`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
